@@ -1,13 +1,62 @@
 #include <SFML/Graphics.hpp>
 using namespace sf;
 
+//function for the vertical scrolling of water tiles
+float verticalMapMovement(float& verticalPosition, float WaterSpeed, float frameTime)
+{
+    if (verticalPosition <= -160.f)
+    {
+        verticalPosition += 160.f;
+    }
+    else
+    {
+        verticalPosition -= WaterSpeed * frameTime;
+    }
+
+	return verticalPosition;
+}
+
+//function to calculate the horizontal direction
+int horizontalDirection()
+{
+	int Direction;
+	if (Keyboard::isKeyPressed(Keyboard::D) || Keyboard::isKeyPressed(Keyboard::Right))
+	{
+		Direction = 1;
+	}
+	else if (Keyboard::isKeyPressed(Keyboard::A) || Keyboard::isKeyPressed(Keyboard::Left))
+	{
+		Direction = -1;
+	}
+	else
+	{
+		Direction = 0;
+	}
+	return Direction;
+}
+
+//function for the horizontal movement of the circle shape
+float horizontalMapMovement(float& HorizontalWaterMovement, int Direction, float WaterSpeed, float frameTime)
+{
+    HorizontalWaterMovement -= Direction * WaterSpeed * frameTime;
+
+    if (HorizontalWaterMovement <= -160.f)
+    {
+        HorizontalWaterMovement += 160.f;
+    }
+    if (HorizontalWaterMovement > 0.f)
+    {
+        HorizontalWaterMovement -= 160.f;
+    }
+
+	return HorizontalWaterMovement;
+}
+
 int main() {
 
     //defining all the constants for circle shape, window size and movements
     int const width = 1280;
     int const height = 720;
-    float const downMovement = 60.f;
-    float const sideMovement = 300.f;
     float const radius = 32.f;
 
     //creation of the window
@@ -48,41 +97,9 @@ int main() {
             }
         }
 
-        //as soon as vertical movement causes tiles to move down 160 pixels, they are reset to original position on screen to create an endless map feel
-        if (VerticalWaterMovement <= -160.f)
-        {
-            VerticalWaterMovement += 160.f;
-        }
-        else
-        {
-            VerticalWaterMovement -= WaterSpeed * frameTime;
-        }
-
-        //left/right and A/D keys used to control horizontal movement of tiles, when nothing is pressed it moves straight down
-        if (Keyboard::isKeyPressed(Keyboard::D) || Keyboard::isKeyPressed(Keyboard::Right))
-        {
-            Direction = 1;
-        }
-        else if (Keyboard::isKeyPressed(Keyboard::A) || Keyboard::isKeyPressed(Keyboard::Left))
-        {
-            Direction = -1;
-        }
-        else
-        {
-            Direction = 0;
-        }
-
-        //calculation of the horizontal movement, as soon as the tiles move out of screen, they are reset to original positions
-        HorizontalWaterMovement -= Direction * WaterSpeed * frameTime;
-
-        if (HorizontalWaterMovement <= -160.f)
-        {
-            HorizontalWaterMovement += 160.f;
-        }
-        if (HorizontalWaterMovement > 0.f)
-        {
-            HorizontalWaterMovement -= 160.f;
-        }
+        VerticalWaterMovement = verticalMapMovement(VerticalWaterMovement, WaterSpeed, frameTime); 
+		Direction = horizontalDirection();
+		HorizontalWaterMovement = horizontalMapMovement(HorizontalWaterMovement, Direction, WaterSpeed, frameTime);
 
         window.clear(Color(30, 80, 140));  // screen color set to a blue shade
         //following loop draws water tiles to show details of map
