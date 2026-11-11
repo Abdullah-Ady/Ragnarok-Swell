@@ -16,21 +16,28 @@ float verticalMapMovement(float& verticalPosition, float WaterSpeed, float frame
 	return verticalPosition;
 }
 
-//function to calculate the horizontal direction
-int horizontalDirection()
+//function to calculate the horizontal direction and to set scrolling to of map to false or true depending upon key pressed
+int horizontalDirection(Keyboard::Key key, int Direction, bool& scrolling)
 {
-	int Direction;
-	if (Keyboard::isKeyPressed(Keyboard::D) || Keyboard::isKeyPressed(Keyboard::Right))
-	{
-		Direction = 1;
-	}
-	else if (Keyboard::isKeyPressed(Keyboard::A) || Keyboard::isKeyPressed(Keyboard::Left))
-	{
-		Direction = -1;
-	}
-	else
+    if (key == Keyboard::D || key == Keyboard::Right)
+    {
+        Direction = 1;
+        scrolling = true;
+    }
+    else if (key == Keyboard::A || key == Keyboard::Left)
+    {
+        Direction = -1;
+        scrolling = true;
+    }
+	else if (key == Keyboard::S || key == Keyboard::Down)
 	{
 		Direction = 0;
+		scrolling = true;
+	}
+	else if (key == Keyboard::W || key == Keyboard::Up)
+	{
+		Direction = 0;
+		scrolling = false;
 	}
 	return Direction;
 }
@@ -79,7 +86,8 @@ int main() {
     float VerticalWaterMovement = 0.f;
     float const WaterSpeed = 150.f;
     float HorizontalWaterMovement = 0.f;
-    int Direction;
+    int Direction = 0;
+    bool scrolling = false;
 
     while (window.isOpen())
     {
@@ -95,11 +103,17 @@ int main() {
             {
                 window.close();
             }
+            if (event.type == Event::KeyPressed) // now the horizontal direction movement is checked through event KeyPressed so direction is set once
+            {
+				Direction = horizontalDirection(event.key.code, Direction, scrolling);
+            }
         }
 
-        VerticalWaterMovement = verticalMapMovement(VerticalWaterMovement, WaterSpeed, frameTime); 
-		Direction = horizontalDirection();
-		HorizontalWaterMovement = horizontalMapMovement(HorizontalWaterMovement, Direction, WaterSpeed, frameTime);
+        if(scrolling) // if map is scrolling only then the horizontal and vertical movement functions are called to move the watertiles
+        {
+            VerticalWaterMovement = verticalMapMovement(VerticalWaterMovement, WaterSpeed, frameTime);
+            HorizontalWaterMovement = horizontalMapMovement(HorizontalWaterMovement, Direction, WaterSpeed, frameTime);
+        }
 
         window.clear(Color(30, 80, 140));  // screen color set to a blue shade
         //following loop draws water tiles to show details of map
