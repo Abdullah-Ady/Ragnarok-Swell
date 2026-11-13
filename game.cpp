@@ -1,5 +1,8 @@
 #include <SFML/Graphics.hpp>
+#include <vector>
+#include <random>
 using namespace sf;
+using namespace std;
 
 //Setting constants as global
 int const width = 1280;
@@ -8,6 +11,12 @@ float const radius = 56.f;
 float const WaterSpeed = 150.f;
 float const maximumFrameTime = 0.1f;
 
+int const maxNumObstacles = 10;
+float const obstacleWidth = 64.f;
+float const obstacleHeight = 64.f;
+Color const obstacleColor(120, 90, 60);
+float const ODL = -500; //Obstacle Distance limit, the maximum distance after the obstacles are despawned
+
 //adding structs to our game
 struct WaterMap
 {
@@ -15,23 +24,29 @@ struct WaterMap
     float HorizontalWaterMovement = 0.f;
 };
 
+struct Obstacle
+{
+    float xpos = 0.f;
+    float ypos = 0.f;
+};
+
 struct GameState
 {
     WaterMap waterMap;
     bool scrolling = false;
     int Direction = 0;
+	vector <Obstacle> obstacles;
+    mt19937 randomizer;
 };
 
 //function for the vertical scrolling of water tiles
 float verticalMapMovement(float& verticalPosition, float WaterSpeed, float frameTime)
 {
+    verticalPosition -= WaterSpeed * frameTime;
+
     if (verticalPosition <= -160.f)
     {
         verticalPosition += 160.f;
-    }
-    else
-    {
-        verticalPosition -= WaterSpeed * frameTime;
     }
 
     return verticalPosition;
@@ -80,9 +95,61 @@ float horizontalMapMovement(float& HorizontalWaterMovement, int Direction, float
     return HorizontalWaterMovement;
 }
 
+//function for spawning obstacles at random positions on the screen
+void ObstacleSpawn(GameState& g)
+{
+    if (int(g.obstacles.size()) < maxNumObstacles)
+    {
+        uniform_int_distribution<int> randomX(-width, 2 * width - 1);
+        uniform_int_distribution<int> randomY(0, 2 * height - 1);
+
+        Obstacle newObstacle;
+        newObstacle.xpos = float(randomX(g.randomizer));
+        newObstacle.ypos = float(randomY(g.randomizer));
+
+        if (newObstacle.xpos >= 0.f && newObstacle.xpos <= float(width) && newObstacle.ypos >= 0.f && newObstacle.ypos <= float(height))
+        {
+            return;
+        }
+
+        g.obstacles.push_back(newObstacle);
+    }
+}
+
+//function for scrolling the obstacles along with the water tiles
+void ObstacleScroll(GameState& g, float distanceX, float distanceY)
+{
+    for (int i = 0; i < int(g.obstacles.size()); ++i)
+    {
+        g.obstacles[i].xpos += distanceX;
+        g.obstacles[i].ypos += distanceY;
+    }
+}
+
+//function for removing obstacles that have scrolled off the screen
+void ObstacleRemoval(GameState& g)
+{
+    int count = 0;
+    while (count < int(g.obstacles.size()))
+    {
+        if (g.obstacles[count].ypos < float(ODL))
+        {
+            g.obstacles.erase(g.obstacles.begin() + count);
+        }
+        else
+        {
+            ++count;
+        }
+    }
+}
+
+
 int main() {
     //declaring a variable of gamestate that stores current gamestate (scrolling or stopped)
     GameState gameState;
+
+	//seeding the random number generator for obstacle spawning
+    gameState.randomizer.seed(random_device{}());
 
     //creation of the window
     RenderWindow window(VideoMode(width, height), "Surf", Style::Titlebar | Style::Close);
