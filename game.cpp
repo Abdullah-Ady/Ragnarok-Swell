@@ -11,7 +11,7 @@ float const radius = 56.f;
 float const WaterSpeed = 150.f;
 float const maximumFrameTime = 0.1f;
 
-int const maxNumObstacles = 10;
+int const maxNumObstacles = 20;
 float const obstacleWidth = 64.f;
 float const obstacleHeight = 64.f;
 Color const obstacleColor(120, 90, 60);
@@ -35,7 +35,7 @@ struct GameState
     WaterMap waterMap;
     bool scrolling = false;
     int Direction = 0;
-	vector <Obstacle> obstacles;
+    vector <Obstacle> obstacles;
     mt19937 randomizer;
 };
 
@@ -148,7 +148,7 @@ int main() {
     //declaring a variable of gamestate that stores current gamestate (scrolling or stopped)
     GameState gameState;
 
-	//seeding the random number generator for obstacle spawning
+    //seeding the random number generator for obstacle spawning
     gameState.randomizer.seed(random_device{}());
 
     //creation of the window
@@ -163,6 +163,10 @@ int main() {
     //setting up details of the water map
     Vector2f const TileSize(10.f, 50.f);
     RectangleShape waterTile(TileSize);
+
+    //setting up details for obstacles
+    RectangleShape obstacleTile(Vector2f(obstacleWidth, obstacleHeight));
+    obstacleTile.setFillColor(obstacleColor);
 
     Clock clock;  //declaring a clock to keep counting time between each frame
 
@@ -188,10 +192,19 @@ int main() {
             }
         }
 
-        if (gameState.scrolling) // if map is scrolling only then the horizontal and vertical movement functions are called to move the watertiles
+        //calling both the obstacle spawn and removal functions to spawn and remove obstacles from window
+        ObstacleSpawn(gameState);
+        ObstacleRemoval(gameState);
+
+        if (gameState.scrolling) // if map is scrolling only then the horizontal and vertical movement functions are called to move the watertiles and the obstacles along with them
         {
+            float distanceX = -gameState.Direction * WaterSpeed * frameTime;
+            float distanceY = -WaterSpeed * frameTime;
+
             gameState.waterMap.VerticalWaterMovement = verticalMapMovement(gameState.waterMap.VerticalWaterMovement, WaterSpeed, frameTime);
             gameState.waterMap.HorizontalWaterMovement = horizontalMapMovement(gameState.waterMap.HorizontalWaterMovement, gameState.Direction, WaterSpeed, frameTime);
+
+            ObstacleScroll(gameState, distanceX, distanceY);
         }
 
         window.clear(Color(30, 80, 140));  // screen color set to a blue shade
@@ -212,6 +225,14 @@ int main() {
                 window.draw(waterTile);
             }
         }
+        // following loop draws the obstacles on the screen uses same logic as watertiles
+        for (int i = 0; i < int(gameState.obstacles.size()); ++i)
+        {
+            obstacleTile.setPosition(gameState.obstacles[i].xpos, gameState.obstacles[i].ypos);
+            window.draw(obstacleTile);
+        }
+
+
         window.draw(shape);
         window.display();
     }
