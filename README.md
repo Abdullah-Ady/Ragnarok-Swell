@@ -13,7 +13,6 @@ The game is for a Programming Fundamentals course project. Its original proposal
 
 - Steer left and right with the arrow keys to weave through the ocean.
 - Collect speed boosters and spend them to escape monsters.
-- The longer you survive, the harder it gets: the surfer speeds up (to a cap), more obstacles appear, and monsters track you faster.
 - Hitting obstacles three times, or being caught by a monster, ends the run and offers a restart.
 - The farthest distance travelled is saved as the high score.
 - Extra mechanics:  camera shake on impact and bespoke pixel art.
