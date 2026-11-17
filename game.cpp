@@ -17,6 +17,19 @@ float const obstacleHeight = 64.f;
 Color const obstacleColor(120, 90, 60);
 float const ODL = -500; //Obstacle Distance limit, the maximum distance after the obstacles are despawned
 
+float const boosterWidth = 48.f;
+float const boosterHeight = 48.f;
+Color const boosterColor(255, 220, 0);
+int const numBoosterSpots = 4;
+
+Vector2f const boosterSpots[numBoosterSpots] = {
+    Vector2f(160.f, height + 40.f),
+    Vector2f(480.f, height + 40.f),
+    Vector2f(800.f, height + 40.f),
+    Vector2f(1120.f, height + 40.f)
+};
+int const boosterSpawnChance = 300;
+
 //adding structs to our game
 struct WaterMap
 {
@@ -28,6 +41,7 @@ struct Obstacle
 {
     float xpos = 0.f;
     float ypos = 0.f;
+    bool isBooster = false; // no need for a booster struct, it uses same logic as obstacle, bool is just true if this obstacle is a booster triangle
 };
 
 struct GameState
@@ -116,6 +130,26 @@ void ObstacleSpawn(GameState& g)
     }
 }
 
+//function for spawning a booster at one of the fixed spots
+void BoosterSpawn(GameState& g)
+{
+    uniform_int_distribution<int> chance(0, boosterSpawnChance - 1);
+    if (chance(g.randomizer) != 0)
+    {
+        return;
+    }
+
+    uniform_int_distribution<int> randomSpot(0, numBoosterSpots - 1);
+    int spot = randomSpot(g.randomizer);
+
+    Obstacle newBooster;
+    newBooster.xpos = boosterSpots[spot].x;
+    newBooster.ypos = boosterSpots[spot].y;
+    newBooster.isBooster = true;
+
+    g.obstacles.push_back(newBooster);
+}
+
 //function for scrolling the obstacles along with the water tiles
 void ObstacleScroll(GameState& g, float distanceX, float distanceY)
 {
@@ -168,6 +202,13 @@ int main() {
     RectangleShape obstacleTile(Vector2f(obstacleWidth, obstacleHeight));
     obstacleTile.setFillColor(obstacleColor);
 
+    //setting up the yellow triangle used to draw boosters
+    ConvexShape boosterTile(3);
+    boosterTile.setPoint(0, Vector2f(boosterWidth / 2.f, 0.f));
+    boosterTile.setPoint(1, Vector2f(boosterWidth, boosterHeight));
+    boosterTile.setPoint(2, Vector2f(0.f, boosterHeight));
+    boosterTile.setFillColor(boosterColor);
+
     Clock clock;  //declaring a clock to keep counting time between each frame
 
     while (window.isOpen())
@@ -194,6 +235,7 @@ int main() {
 
         //calling both the obstacle spawn and removal functions to spawn and remove obstacles from window
         ObstacleSpawn(gameState);
+        BoosterSpawn(gameState);
         ObstacleRemoval(gameState);
 
         if (gameState.scrolling) // if map is scrolling only then the horizontal and vertical movement functions are called to move the watertiles and the obstacles along with them
@@ -228,8 +270,16 @@ int main() {
         // following loop draws the obstacles on the screen uses same logic as watertiles
         for (int i = 0; i < int(gameState.obstacles.size()); ++i)
         {
-            obstacleTile.setPosition(gameState.obstacles[i].xpos, gameState.obstacles[i].ypos);
-            window.draw(obstacleTile);
+            if (gameState.obstacles[i].isBooster)
+            {
+                boosterTile.setPosition(gameState.obstacles[i].xpos, gameState.obstacles[i].ypos);
+                window.draw(boosterTile);
+            }
+            else
+            {
+                obstacleTile.setPosition(gameState.obstacles[i].xpos, gameState.obstacles[i].ypos);
+                window.draw(obstacleTile);
+            }
         }
 
 
