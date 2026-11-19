@@ -315,8 +315,11 @@ int main() {
         }
 
         //calling both the obstacle spawn and removal functions to spawn and remove obstacles from window
-        ObstacleSpawn(gameState);
-        BoosterSpawn(gameState);
+        if (gameState.scrolling)
+        {
+            ObstacleSpawn(gameState);
+            BoosterSpawn(gameState);
+        }
         ObstacleRemoval(gameState);
         ObstacleCollision(gameState, FloatRect(shape.getPosition().x, shape.getPosition().y, radius * 2.f, radius * 2.f));
 
