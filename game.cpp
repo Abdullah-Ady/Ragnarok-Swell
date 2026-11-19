@@ -30,6 +30,11 @@ Vector2f const boosterSpots[numBoosterSpots] = {
 };
 int const boosterSpawnChance = 300;
 
+float const boostSpeedMultiplier = 3.f;
+float const obstacleSpeedReducer = 0.3f;
+float const boostDuration = 2.f;
+float const obstacleCollisionCoolDown = 0.3f;
+
 //adding structs to our game
 struct WaterMap
 {
@@ -51,6 +56,8 @@ struct GameState
     int Direction = 0;
     vector <Obstacle> obstacles;
     mt19937 randomizer;
+	float boostTimer = 0.f;
+	float  obstacleCollisionTimer = 0.f;
 };
 
 //function for the vertical scrolling of water tiles
@@ -109,6 +116,71 @@ float horizontalMapMovement(float& HorizontalWaterMovement, int Direction, float
     return HorizontalWaterMovement;
 }
 
+//function for a bug we saw, this removed any overlapping boosts or obstacles
+bool SpotOverlapsObstacle(GameState const& g, FloatRect spot)
+{
+    for (int i = 0; i < int(g.obstacles.size()); ++i)
+    {
+        float w, h;
+        if (g.obstacles[i].isBooster)
+        {
+            w = boosterWidth;
+            h = boosterHeight;
+        }
+        else
+        {
+            w = obstacleWidth;
+            h = obstacleHeight;
+        }
+
+        FloatRect existing(g.obstacles[i].xpos, g.obstacles[i].ypos, w, h);
+        if (spot.intersects(existing))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+// used for collision with boost or obstacle to control player speed
+void ObstacleCollision(GameState& g, FloatRect playerBounds)
+{
+    int count = 0;
+    while (count < int(g.obstacles.size()))
+    {
+        float w, h;
+        if (g.obstacles[count].isBooster)
+        {
+            w = boosterWidth;
+            h = boosterHeight;
+        }
+        else
+        {
+            w = obstacleWidth;
+            h = obstacleHeight;
+        }
+
+        FloatRect obstacleBounds(g.obstacles[count].xpos, g.obstacles[count].ypos, w, h);
+        if (playerBounds.intersects(obstacleBounds))
+        {
+            if (g.obstacles[count].isBooster)
+            {
+                g.obstacles.erase(g.obstacles.begin() + count);
+                g.boostTimer = boostDuration;
+            }
+            else
+            {
+                g.obstacleCollisionTimer = obstacleCollisionCoolDown;
+                ++count;
+            }
+        }
+        else
+        {
+            ++count;
+        }
+    }
+}
+
 //function for spawning obstacles at random positions on the screen
 void ObstacleSpawn(GameState& g)
 {
@@ -122,6 +194,10 @@ void ObstacleSpawn(GameState& g)
         newObstacle.ypos = float(randomY(g.randomizer));
 
         if (newObstacle.xpos >= 0.f && newObstacle.xpos <= float(width) && newObstacle.ypos >= 0.f && newObstacle.ypos <= float(height))
+        {
+            return;
+        }
+        if (SpotOverlapsObstacle(g, FloatRect(newObstacle.xpos, newObstacle.ypos, obstacleWidth, obstacleHeight)))
         {
             return;
         }
@@ -146,6 +222,11 @@ void BoosterSpawn(GameState& g)
     newBooster.xpos = boosterSpots[spot].x;
     newBooster.ypos = boosterSpots[spot].y;
     newBooster.isBooster = true;
+
+    if (SpotOverlapsObstacle(g, FloatRect(newBooster.xpos, newBooster.ypos, boosterWidth, boosterHeight)))
+    {
+        return;
+    }
 
     g.obstacles.push_back(newBooster);
 }
@@ -237,14 +318,27 @@ int main() {
         ObstacleSpawn(gameState);
         BoosterSpawn(gameState);
         ObstacleRemoval(gameState);
+        ObstacleCollision(gameState, FloatRect(shape.getPosition().x, shape.getPosition().y, radius * 2.f, radius * 2.f));
+
+        float currentSpeed = WaterSpeed;
+        if (gameState.boostTimer > 0.f)
+        {
+            currentSpeed = WaterSpeed * boostSpeedMultiplier;
+            gameState.boostTimer -= frameTime;
+        }
+        if (gameState.obstacleCollisionTimer > 0.f)
+        {
+            currentSpeed = WaterSpeed * obstacleSpeedReducer;
+            gameState.obstacleCollisionTimer -= frameTime;
+        }
 
         if (gameState.scrolling) // if map is scrolling only then the horizontal and vertical movement functions are called to move the watertiles and the obstacles along with them
         {
-            float distanceX = -gameState.Direction * WaterSpeed * frameTime;
-            float distanceY = -WaterSpeed * frameTime;
+            float distanceX = -gameState.Direction * currentSpeed * frameTime;
+            float distanceY = -currentSpeed * frameTime;
 
-            gameState.waterMap.VerticalWaterMovement = verticalMapMovement(gameState.waterMap.VerticalWaterMovement, WaterSpeed, frameTime);
-            gameState.waterMap.HorizontalWaterMovement = horizontalMapMovement(gameState.waterMap.HorizontalWaterMovement, gameState.Direction, WaterSpeed, frameTime);
+            gameState.waterMap.VerticalWaterMovement = verticalMapMovement(gameState.waterMap.VerticalWaterMovement, currentSpeed, frameTime);
+            gameState.waterMap.HorizontalWaterMovement = horizontalMapMovement(gameState.waterMap.HorizontalWaterMovement, gameState.Direction, currentSpeed, frameTime);
 
             ObstacleScroll(gameState, distanceX, distanceY);
         }
