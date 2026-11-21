@@ -30,7 +30,8 @@ Vector2f const boosterSpots[numBoosterSpots] = {
     Vector2f(800.f, height + 40.f),
     Vector2f(1120.f, height + 40.f)
 };
-int const boosterSpawnChance = 300;
+int const boosterSpawnChance = 600;
+int const maxBoosters = 3;
 
 float const boostSpeedMultiplier = 3.f;
 float const obstacleSpeedReducer = 0.3f;
@@ -50,7 +51,7 @@ Vector2f const lifeSpots[numLifeSpots] = {
     Vector2f(640.f, height + 40.f),
     Vector2f(960.f, height + 40.f)
 };
-int const lifeSpawnChance = boosterSpawnChance * 4;
+int const lifeSpawnChance = 1200;
 int const maxLives = 3;
 int const startingLives = 3;
 
@@ -100,6 +101,7 @@ struct GameState
     float obstacleCollisionTimer = 0.f;
     float slowTimer = 0.f; // > 0 means the water speed is reduced
     int lives = startingLives;
+    int boosters = 0;
     float distance = 0.f; // total distance travelled, used as the score
 };
 
@@ -192,8 +194,15 @@ void ObstacleCollision(GameState& g, FloatRect playerBounds)
         {
             if (g.obstacles[count].isBooster)
             {
-                g.obstacles.erase(g.obstacles.begin() + count);
-                g.boostTimer = boostDuration;
+                if (g.boosters < maxBoosters)
+                {
+                    g.obstacles.erase(g.obstacles.begin() + count);
+                    g.boosters++;
+                }
+                else
+                {
+                    ++count; // storage is full, leave the booster where it is
+                }
             }
             else if (g.obstacles[count].isLife)
             {
@@ -425,6 +434,7 @@ void ResetGame(GameState& g)
     g.obstacleCollisionTimer = 0.f;
     g.slowTimer = 0.f;
     g.lives = startingLives;
+    g.boosters = 0;
     g.distance = 0.f;
 }
 
@@ -473,41 +483,41 @@ int main() {
 
     //seeding the random number generator for obstacle spawning
     gameState.randomizer.seed(random_device{}());
-    
+
     //creation of the window
     RenderWindow window(VideoMode(width, height), "Surf", Style::Titlebar | Style::Close);
     window.setVerticalSyncEnabled(true);//used to limit the games frame rate to the pc's refresh rate
-   
+
     //setting up the circle and all its properties
     CircleShape shape(radius);
     shape.setFillColor(Color::Green);
     shape.setPosition((width / 2.f - radius), (height / 3.f - radius));
-   
+
     //setting up details of the water map
     Vector2f const TileSize(10.f, 50.f);
     RectangleShape waterTile(TileSize);
-    
+
     //setting up details for obstacles
     RectangleShape obstacleTile(Vector2f(obstacleWidth, obstacleHeight));
     obstacleTile.setFillColor(obstacleColor);
-   
+
     //setting up the purple square used to draw monsters
     RectangleShape monsterTile(Vector2f(monsterWidth, monsterHeight));
     monsterTile.setFillColor(monsterColor);
-   
+
     //setting up the yellow triangle used to draw boosters
     ConvexShape boosterTile(3);
     boosterTile.setPoint(0, Vector2f(boosterWidth / 2.f, 0.f));
     boosterTile.setPoint(1, Vector2f(boosterWidth, boosterHeight));
     boosterTile.setPoint(2, Vector2f(0.f, boosterHeight));
     boosterTile.setFillColor(boosterColor);
-   
+
     //setting up the red circle used to draw lives
     CircleShape lifeTile(lifeWidth / 2.f);
     lifeTile.setFillColor(lifeColor);
     lifeTile.setOutlineColor(Color::White);
     lifeTile.setOutlineThickness(2.f);
-  
+
     //setting up the life counter text at the top middle of the screen
     Font font;
     if (!font.loadFromFile("C:/Windows/Fonts/pala.ttf"))
@@ -521,7 +531,7 @@ int main() {
     lifeText.setOutlineColor(Color::Black);
     lifeText.setOutlineThickness(2.f);
     lifeText.setPosition(width / 2.f, 10.f); // x is the horizontal center, the origin is set every frame below
-   
+
     //distance text, centered directly below the lives text
     Text distanceText;
     distanceText.setFont(font);
@@ -530,7 +540,7 @@ int main() {
     distanceText.setOutlineColor(Color::Black);
     distanceText.setOutlineThickness(2.f);
     distanceText.setPosition(width / 2.f, 50.f); // 40 pixels below the lives text
-   
+
     //setting up the game over text
     Text gameOverText;
     gameOverText.setFont(font);
@@ -542,7 +552,7 @@ int main() {
     FloatRect goBounds = gameOverText.getLocalBounds();
     gameOverText.setOrigin(goBounds.left + goBounds.width / 2.f, goBounds.top + goBounds.height / 2.f);
     gameOverText.setPosition(width / 2.f, height / 2.f);
-  
+
     //loading the saved high scores and sorting them
     vector<int> highScores;
     LoadScores(highScores);
@@ -552,7 +562,7 @@ int main() {
     {
         bestScore = highScores[0];
     }
- 
+
     //best score text at the top right
     Text bestText;
     bestText.setFont(font);
@@ -569,7 +579,7 @@ int main() {
         {
             frameTime = maximumFrameTime;
         }
-    
+
         //following loop checks if user presses the 'x' or cross button to shut window to close program
         Event event;
         while (window.pollEvent(event))
@@ -590,12 +600,21 @@ int main() {
                 }
                 else
                 {
+                    // Now if F is pressed, only then booster applies
+                    if (event.key.code == Keyboard::F)
+                    {
+                        if (gameState.boosters > 0 && gameState.boostTimer <= 0.f && gameState.scrolling)
+                        {
+                            gameState.boosters--;
+                            gameState.boostTimer = boostDuration;
+                        }
+                    }
                     // now the horizontal direction movement is checked through event KeyPressed so direction is set once
                     gameState.Direction = horizontalDirection(event.key.code, gameState.Direction, gameState.scrolling);
                 }
             }
         }
-    
+
         // the game only updates while the player still has lives, otherwise everything freezes
         if (gameState.lives > 0)
         {
@@ -611,7 +630,7 @@ int main() {
             // the player's rectangle, built once and used for both the obstacles and the monsters
             FloatRect playerBounds(shape.getPosition().x, shape.getPosition().y, radius * 2.f, radius * 2.f);
             ObstacleCollision(gameState, playerBounds);
-            
+
             float speedFactor = 1.f;
             if (gameState.distance / 10.f >= speedUpDistance)
             {
@@ -632,7 +651,7 @@ int main() {
             {
                 gameState.obstacleCollisionTimer -= frameTime;
             }
-        
+
             if (gameState.scrolling) // if map is scrolling only then the horizontal and vertical movement functions are called to move the watertiles and the obstacles along with them
             {
                 float distanceX = -gameState.Direction * currentSpeed * frameTime;
@@ -657,20 +676,20 @@ int main() {
                 bestScore = highScores[0];
             }
         }
-      
+
         //updating the life counter, distance and best score text
-        lifeText.setString("Lives: " + to_string(gameState.lives));
+        lifeText.setString("Lives: " + to_string(gameState.lives) + "    Boosters: " + to_string(gameState.boosters));
         distanceText.setString(to_string(int(gameState.distance / 10.f)) + "m");
         bestText.setString("Best: " + to_string(bestScore));
-     
+
         //re-centering the lives and distance text horizontally since their width changes with the text
         FloatRect lifeBounds = lifeText.getLocalBounds();
         lifeText.setOrigin(lifeBounds.left + lifeBounds.width / 2.f, 0.f);
         FloatRect distBounds = distanceText.getLocalBounds();
         distanceText.setOrigin(distBounds.left + distBounds.width / 2.f, 0.f);
-     
+
         window.clear(Color(30, 80, 140));  // screen color set to a blue shade
-        
+
         for (int column = 0; column < 18; column++)
         {
             for (int row = 0; row < 11; row++)
@@ -687,7 +706,7 @@ int main() {
                 window.draw(waterTile);
             }
         }
-      
+
         // following loop draws the obstacles, boosters and lives on the screen
         for (int i = 0; i < int(gameState.obstacles.size()); ++i)
         {
@@ -714,12 +733,12 @@ int main() {
             monsterTile.setPosition(gameState.monsters[i].xpos, gameState.monsters[i].ypos);
             window.draw(monsterTile);
         }
-     
+
         window.draw(shape);
         window.draw(lifeText);
         window.draw(distanceText);
         window.draw(bestText);
-       
+
         //draws the end screen on top of everything when the player has no lives left
         if (gameState.lives <= 0)
         {
@@ -729,7 +748,7 @@ int main() {
             window.draw(overlay);
             window.draw(gameOverText);
         }
-       
+
         window.display();
     }
     return 0;
