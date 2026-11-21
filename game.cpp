@@ -2,6 +2,7 @@
 #include <vector>
 #include <random>
 #include <string>
+#include <fstream>
 using namespace sf;
 using namespace std;
 
@@ -11,22 +12,15 @@ int const height = 720;
 float const radius = 56.f;
 float const WaterSpeed = 150.f;
 float const maximumFrameTime = 0.1f;
-
-
-
 int const maxNumObstacles = 20;
 float const obstacleWidth = 64.f;
 float const obstacleHeight = 64.f;
 Color const obstacleColor(120, 90, 60);
 float const ODL = -500; //Obstacle Distance limit, the maximum distance after the obstacles are despawned
-
-
-
 float const boosterWidth = 48.f;
 float const boosterHeight = 48.f;
 Color const boosterColor(255, 220, 0);
 int const numBoosterSpots = 4;
-
 Vector2f const boosterSpots[numBoosterSpots] = {
     Vector2f(160.f, height + 40.f),
     Vector2f(480.f, height + 40.f),
@@ -39,8 +33,8 @@ float const obstacleSpeedReducer = 0.3f;
 float const boostDuration = 2.f;
 float const obstacleCollisionCoolDown = 2.f; // value raised from 0.3f, it now acts as the invincibility duration
 float const slowDuration = 0.5f;             // how long you are slowed after losing a life
-
-
+float const speedUpDistance = 500.f;         // in meters (the same value shown on screen)
+float const speedUpMultiplier = 1.2f;        // water speed multiplier once speedUpDistance is reached
 
 //constants for lives
 float const lifeWidth = 40.f;
@@ -52,12 +46,9 @@ Vector2f const lifeSpots[numLifeSpots] = {
     Vector2f(640.f, height + 40.f),
     Vector2f(960.f, height + 40.f)
 };
-
-
 int const lifeSpawnChance = boosterSpawnChance * 4;
 int const maxLives = 3;
 int const startingLives = 3;
-
 
 //adding structs to our game
 struct WaterMap
@@ -65,6 +56,7 @@ struct WaterMap
     float VerticalWaterMovement = 0.f;
     float HorizontalWaterMovement = 0.f;
 };
+
 struct Obstacle
 {
     float xpos = 0.f;
@@ -72,6 +64,7 @@ struct Obstacle
     bool isBooster = false; // true if this obstacle is a booster triangle
     bool isLife = false;    // true if this obstacle is a life pickup (if both are false it is a normal obstacle)
 };
+
 struct GameState
 {
     WaterMap waterMap;
@@ -83,7 +76,9 @@ struct GameState
     float obstacleCollisionTimer = 0.f;
     float slowTimer = 0.f; // > 0 means the water speed is reduced
     int lives = startingLives;
+    float distance = 0.f; // total distance travelled, used as the score
 };
+
 //function for the vertical scrolling of water tiles
 float verticalMapMovement(float& verticalPosition, float WaterSpeed, float frameTime)
 {
@@ -94,6 +89,7 @@ float verticalMapMovement(float& verticalPosition, float WaterSpeed, float frame
     }
     return verticalPosition;
 }
+
 //function to calculate the horizontal direction and to set scrolling to of map to false or true depending upon key pressed
 int horizontalDirection(Keyboard::Key key, int Direction, bool& scrolling)
 {
@@ -119,6 +115,7 @@ int horizontalDirection(Keyboard::Key key, int Direction, bool& scrolling)
     }
     return Direction;
 }
+
 //function for the horizontal movement of the water
 float horizontalMapMovement(float& HorizontalWaterMovement, int Direction, float WaterSpeed, float frameTime)
 {
@@ -133,6 +130,7 @@ float horizontalMapMovement(float& HorizontalWaterMovement, int Direction, float
     }
     return HorizontalWaterMovement;
 }
+
 //returns the bounds of an obstacle/booster/life depending on what it is
 FloatRect ObstacleBounds(Obstacle const& o)
 {
@@ -146,6 +144,7 @@ FloatRect ObstacleBounds(Obstacle const& o)
     }
     return FloatRect(o.xpos, o.ypos, obstacleWidth, obstacleHeight);
 }
+
 //function for a bug we saw, this removed any overlapping boosts, lives or obstacles
 bool SpotOverlapsObstacle(GameState const& g, FloatRect spot)
 {
@@ -158,6 +157,7 @@ bool SpotOverlapsObstacle(GameState const& g, FloatRect spot)
     }
     return false;
 }
+
 // used for collision with boost, life or obstacle
 void ObstacleCollision(GameState& g, FloatRect playerBounds)
 {
@@ -198,6 +198,7 @@ void ObstacleCollision(GameState& g, FloatRect playerBounds)
         }
     }
 }
+
 //function for spawning obstacles at random positions on the screen
 void ObstacleSpawn(GameState& g)
 {
@@ -218,9 +219,8 @@ void ObstacleSpawn(GameState& g)
         }
         g.obstacles.push_back(newObstacle);
     }
-
-
 }
+
 //function for spawning a booster at one of the fixed spots
 void BoosterSpawn(GameState& g)
 {
@@ -240,10 +240,8 @@ void BoosterSpawn(GameState& g)
         return;
     }
     g.obstacles.push_back(newBooster);
-
-
-
 }
+
 //function for spawning a life at one of the fixed life spots (much rarer than boosters)
 void LifeSpawn(GameState& g)
 {
@@ -264,6 +262,7 @@ void LifeSpawn(GameState& g)
     }
     g.obstacles.push_back(newLife);
 }
+
 //function for scrolling the obstacles along with the water tiles
 void ObstacleScroll(GameState& g, float distanceX, float distanceY)
 {
@@ -273,6 +272,7 @@ void ObstacleScroll(GameState& g, float distanceX, float distanceY)
         g.obstacles[i].ypos += distanceY;
     }
 }
+
 //function for removing obstacles that have scrolled off the screen
 void ObstacleRemoval(GameState& g)
 {
@@ -289,6 +289,7 @@ void ObstacleRemoval(GameState& g)
         }
     }
 }
+
 //function to reset the game after game over (keeps the random number generator as it is)
 void ResetGame(GameState& g)
 {
@@ -300,15 +301,55 @@ void ResetGame(GameState& g)
     g.obstacleCollisionTimer = 0.f;
     g.slowTimer = 0.f;
     g.lives = startingLives;
+    g.distance = 0.f;
 }
+
+//function to read the saved scores from the text file into a vector
+void LoadScores(vector<int>& scores)
+{
+    scores.clear();
+    ifstream file("highscores.txt");
+    int value;
+    while (file >> value)
+    {
+        scores.push_back(value);
+    }
+}
+
+//bubble sort, puts the highest score at the start of the vector
+void BubbleSort(vector<int>& scores)
+{
+    for (int i = 0; i < int(scores.size()) - 1; ++i)
+    {
+        for (int j = 0; j < int(scores.size()) - 1 - i; ++j)
+        {
+            if (scores[j] < scores[j + 1])
+            {
+                int temp = scores[j];
+                scores[j] = scores[j + 1];
+                scores[j + 1] = temp;
+            }
+        }
+    }
+}
+
+//function to write the scores back into the text file
+void SaveScores(vector<int> const& scores)
+{
+    ofstream file("highscores.txt");
+    for (int i = 0; i < int(scores.size()); ++i)
+    {
+        file << scores[i] << "\n";
+    }
+}
+
 int main() {
     //declaring a variable of gamestate that stores current gamestate (scrolling or stopped)
-
     GameState gameState;
 
     //seeding the random number generator for obstacle spawning
-
     gameState.randomizer.seed(random_device{}());
+
     //creation of the window
     RenderWindow window(VideoMode(width, height), "Surf", Style::Titlebar | Style::Close);
     window.setVerticalSyncEnabled(true);//used to limit the games frame rate to the pc's refresh rate
@@ -321,8 +362,8 @@ int main() {
     //setting up details of the water map
     Vector2f const TileSize(10.f, 50.f);
     RectangleShape waterTile(TileSize);
-    //setting up details for obstacles
 
+    //setting up details for obstacles
     RectangleShape obstacleTile(Vector2f(obstacleWidth, obstacleHeight));
     obstacleTile.setFillColor(obstacleColor);
 
@@ -351,10 +392,18 @@ int main() {
     lifeText.setFillColor(Color::White);
     lifeText.setOutlineColor(Color::Black);
     lifeText.setOutlineThickness(2.f);
-    lifeText.setPosition(width / 2.f - 60.f, 10.f);
+    lifeText.setPosition(width / 2.f, 10.f); // x is the horizontal center, the origin is set every frame below
+
+    //distance text, centered directly below the lives text
+    Text distanceText;
+    distanceText.setFont(font);
+    distanceText.setCharacterSize(32);
+    distanceText.setFillColor(Color::White);
+    distanceText.setOutlineColor(Color::Black);
+    distanceText.setOutlineThickness(2.f);
+    distanceText.setPosition(width / 2.f, 50.f); // 40 pixels below the lives text
+
     //setting up the game over text
-
-
     Text gameOverText;
     gameOverText.setFont(font);
     gameOverText.setCharacterSize(64);
@@ -362,14 +411,30 @@ int main() {
     gameOverText.setOutlineColor(Color::Black);
     gameOverText.setOutlineThickness(3.f);
     gameOverText.setString("Musa Died\nPress Enter to restart");
-
     FloatRect goBounds = gameOverText.getLocalBounds();
     gameOverText.setOrigin(goBounds.left + goBounds.width / 2.f, goBounds.top + goBounds.height / 2.f);
     gameOverText.setPosition(width / 2.f, height / 2.f);
+
+    //loading the saved high scores and sorting them
+    vector<int> highScores;
+    LoadScores(highScores);
+    BubbleSort(highScores);
+    int bestScore = 0;
+    if (highScores.size() > 0)
+    {
+        bestScore = highScores[0];
+    }
+
+    //best score text at the top right
+    Text bestText;
+    bestText.setFont(font);
+    bestText.setCharacterSize(32);
+    bestText.setFillColor(Color::White);
+    bestText.setOutlineColor(Color::Black);
+    bestText.setOutlineThickness(2.f);
+    bestText.setPosition(width - 170.f, 10.f);
+
     Clock clock;  //declaring a clock to keep counting time between each frame
-
-
-
     while (window.isOpen())
     {
         float frameTime = clock.restart().asSeconds(); //calculating frame time in seconds, using later for horizontal and vertical distance movement
@@ -377,6 +442,7 @@ int main() {
         {
             frameTime = maximumFrameTime;
         }
+
         //following loop checks if user presses the 'x' or cross button to shut window to close program
         Event event;
         while (window.pollEvent(event))
@@ -402,6 +468,7 @@ int main() {
                 }
             }
         }
+
         // the game only updates while the player still has lives, otherwise everything freezes
         if (gameState.lives > 0)
         {
@@ -414,35 +481,67 @@ int main() {
             }
             ObstacleRemoval(gameState);
             ObstacleCollision(gameState, FloatRect(shape.getPosition().x, shape.getPosition().y, radius * 2.f, radius * 2.f));
-            float currentSpeed = WaterSpeed;
+
+            // if the player just died, save the score (this runs only once per death)
+            if (gameState.lives <= 0)
+            {
+                highScores.push_back(int(gameState.distance / 10.f));
+                BubbleSort(highScores);
+                if (highScores.size() > 10)
+                {
+                    highScores.resize(10); // keep only the top 10
+                }
+                SaveScores(highScores);
+                bestScore = highScores[0];
+            }
+
+            // base speed, increased by 1.2x once the player has travelled 500m
+            // (distance / 10 is the same value that is displayed as meters)
+            float baseSpeed = WaterSpeed;
+            if (gameState.distance / 10.f >= speedUpDistance)
+            {
+                baseSpeed = WaterSpeed * speedUpMultiplier;
+            }
+
+            float currentSpeed = baseSpeed;
             if (gameState.boostTimer > 0.f)
             {
-                currentSpeed = WaterSpeed * boostSpeedMultiplier;
+                currentSpeed = baseSpeed * boostSpeedMultiplier;
                 gameState.boostTimer -= frameTime;
             }
             if (gameState.slowTimer > 0.f) // the speed reduction comes from slowTimer
             {
-                currentSpeed = WaterSpeed * obstacleSpeedReducer;
+                currentSpeed = baseSpeed * obstacleSpeedReducer;
                 gameState.slowTimer -= frameTime;
             }
             if (gameState.obstacleCollisionTimer > 0.f) // this timer only counts down invincibility, it doesn't change the speed
             {
                 gameState.obstacleCollisionTimer -= frameTime;
             }
+
             if (gameState.scrolling) // if map is scrolling only then the horizontal and vertical movement functions are called to move the watertiles and the obstacles along with them
             {
                 float distanceX = -gameState.Direction * currentSpeed * frameTime;
                 float distanceY = -currentSpeed * frameTime;
                 gameState.waterMap.VerticalWaterMovement = verticalMapMovement(gameState.waterMap.VerticalWaterMovement, currentSpeed, frameTime);
                 gameState.waterMap.HorizontalWaterMovement = horizontalMapMovement(gameState.waterMap.HorizontalWaterMovement, gameState.Direction, currentSpeed, frameTime);
+                gameState.distance += currentSpeed * frameTime;
                 ObstacleScroll(gameState, distanceX, distanceY);
             }
         }
 
-        //updating the life counter text
+        //updating the life counter, distance and best score text
         lifeText.setString("Lives: " + to_string(gameState.lives));
-        window.clear(Color(30, 80, 140));  // screen color set to a blue shade
+        distanceText.setString(to_string(int(gameState.distance / 10.f)) + "m");
+        bestText.setString("Best: " + to_string(bestScore));
 
+        //re-centering the lives and distance text horizontally since their width changes with the text
+        FloatRect lifeBounds = lifeText.getLocalBounds();
+        lifeText.setOrigin(lifeBounds.left + lifeBounds.width / 2.f, 0.f);
+        FloatRect distBounds = distanceText.getLocalBounds();
+        distanceText.setOrigin(distBounds.left + distBounds.width / 2.f, 0.f);
+
+        window.clear(Color(30, 80, 140));  // screen color set to a blue shade
 
         for (int column = 0; column < 18; column++)
         {
@@ -460,6 +559,7 @@ int main() {
                 window.draw(waterTile);
             }
         }
+
         // following loop draws the obstacles, boosters and lives on the screen
         for (int i = 0; i < int(gameState.obstacles.size()); ++i)
         {
@@ -479,9 +579,11 @@ int main() {
                 window.draw(obstacleTile);
             }
         }
+
         window.draw(shape);
         window.draw(lifeText);
-
+        window.draw(distanceText);
+        window.draw(bestText);
 
         //draws the end screen on top of everything when the player has no lives left
         if (gameState.lives <= 0)
@@ -492,6 +594,7 @@ int main() {
             window.draw(overlay);
             window.draw(gameOverText);
         }
+
         window.display();
     }
     return 0;
