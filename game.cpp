@@ -10,18 +10,24 @@ using namespace std;
 //Setting constants as global
 int const width = 1280;
 int const height = 720;
-float const radius = 56.f;
-float const WaterSpeed = 150.f;
+float const WaterSpeed = 250.f;
 float const maximumFrameTime = 0.1f;
 
-int const maxNumObstacles = 20;
-float const obstacleWidth = 64.f;
-float const obstacleHeight = 64.f;
+//player sprite and hitbox
+float const playerSpriteSize = 112.f;
+float const playerCenterX = width / 2.f;   // 640
+float const playerCenterY = 240.f;
+float const playerHitWidth = 52.f;
+float const playerHitHeight = 88.f;
+
+int const maxNumObstacles = 30;
+float const obstacleWidth = 200.f;
+float const obstacleHeight = 200.f;
 Color const obstacleColor(120, 90, 60);
 float const ODL = -500; //Obstacle Distance limit, the maximum distance after the obstacles are despawned
 
-float const boosterWidth = 48.f;
-float const boosterHeight = 48.f;
+float const boosterWidth = 40.f;
+float const boosterHeight = 40.f;
 Color const boosterColor(255, 220, 0);
 int const numBoosterSpots = 4;
 Vector2f const boosterSpots[numBoosterSpots] = {
@@ -33,13 +39,13 @@ Vector2f const boosterSpots[numBoosterSpots] = {
 int const boosterSpawnChance = 600;
 int const maxBoosters = 3;
 
-float const boostSpeedMultiplier = 3.f;
+float const boostSpeedMultiplier = 2.f;
 float const obstacleSpeedReducer = 0.3f;
 float const boostDuration = 2.f;
 float const obstacleCollisionCoolDown = 2.f; // value raised from 0.3f, it now acts as the invincibility duration
 float const slowDuration = 0.5f;             // how long you are slowed after losing a life
-float const speedUpDistance = 500.f;         // in meters (the same value shown on screen)
-float const speedUpMultiplier = 1.2f;        // speed multiplier (water and monsters) once speedUpDistance is reached
+float const speedUpDistance = 1500.f;         // in meters (the same value shown on screen)
+float const speedUpMultiplier = 2.5f;        // speed multiplier (water and monsters) once speedUpDistance is reached
 
 //constants for lives
 float const lifeWidth = 40.f;
@@ -56,8 +62,8 @@ int const maxLives = 3;
 int const startingLives = 3;
 
 //constants for the monster
-float const monsterWidth = 50.f;
-float const monsterHeight = 50.f;
+float const monsterWidth = 100.f;
+float const monsterHeight = 100.f;
 Color const monsterColor(150, 0, 200);
 int const monsterSpawnChance = lifeSpawnChance;
 float const monsterSpeedMultiplier = 1.2f;
@@ -79,6 +85,7 @@ struct Obstacle
 {
     float xpos = 0.f;
     float ypos = 0.f;
+    int type = 0;
     bool isBooster = false; // true if this obstacle is a booster triangle
     bool isLife = false;    // true if this obstacle is a life pickup (if both are false it is a normal obstacle)
 };
@@ -103,15 +110,16 @@ struct GameState
     int lives = startingLives;
     int boosters = 0;
     float distance = 0.f; // total distance travelled, used as the score
+    int nextObstacle = 0;
 };
 
 //function for the vertical scrolling of water tiles
 float verticalMapMovement(float& verticalPosition, float WaterSpeed, float frameTime)
 {
     verticalPosition -= WaterSpeed * frameTime;
-    if (verticalPosition <= -160.f)
+    if (verticalPosition <= -720.f)
     {
-        verticalPosition += 160.f;
+        verticalPosition += 720.f;
     }
     return verticalPosition;
 }
@@ -146,13 +154,13 @@ int horizontalDirection(Keyboard::Key key, int Direction, bool& scrolling)
 float horizontalMapMovement(float& HorizontalWaterMovement, int Direction, float WaterSpeed, float frameTime)
 {
     HorizontalWaterMovement -= Direction * WaterSpeed * frameTime;
-    if (HorizontalWaterMovement <= -160.f)
+    if (HorizontalWaterMovement <= -1280.f)
     {
-        HorizontalWaterMovement += 160.f;
+        HorizontalWaterMovement += 1280.f;
     }
     if (HorizontalWaterMovement > 0.f)
     {
-        HorizontalWaterMovement -= 160.f;
+        HorizontalWaterMovement -= 1280.f;
     }
     return HorizontalWaterMovement;
 }
@@ -168,7 +176,7 @@ FloatRect ObstacleBounds(Obstacle const& o)
     {
         return FloatRect(o.xpos, o.ypos, lifeWidth, lifeHeight);
     }
-    return FloatRect(o.xpos, o.ypos, obstacleWidth, obstacleHeight);
+    return FloatRect(o.xpos + 6.f, o.ypos, 100.f, 48.f);
 }
 
 //function for a bug we saw, this removed any overlapping boosts, lives or obstacles
@@ -250,7 +258,9 @@ void ObstacleSpawn(GameState& g)
         {
             return;
         }
+        newObstacle.type = g.nextObstacle;
         g.obstacles.push_back(newObstacle);
+        g.nextObstacle = (g.nextObstacle + 1) % 7;
     }
 }
 
@@ -436,6 +446,7 @@ void ResetGame(GameState& g)
     g.lives = startingLives;
     g.boosters = 0;
     g.distance = 0.f;
+    g.nextObstacle = 0;
 }
 
 //function to read the saved scores from the text file into a vector
@@ -488,35 +499,90 @@ int main() {
     RenderWindow window(VideoMode(width, height), "Surf", Style::Titlebar | Style::Close);
     window.setVerticalSyncEnabled(true);//used to limit the games frame rate to the pc's refresh rate
 
-    //setting up the circle and all its properties
-    CircleShape shape(radius);
-    shape.setFillColor(Color::Green);
-    shape.setPosition((width / 2.f - radius), (height / 3.f - radius));
+    //setting up the player sprite and its left and right movement images which can later be called when left/right keys are used
+    Texture playerStraightTexture;
+    if (!playerStraightTexture.loadFromFile("images/surfer_straight.png"))
+    {
+        return -1;
+    }
+    Texture playerLeftTexture;
+    if (!playerLeftTexture.loadFromFile("images/surfer_left.png"))
+    {
+        return -1;
+    }
+    Texture playerRightTexture;
+    if (!playerRightTexture.loadFromFile("images/surfer_right.png"))
+    {
+        return -1;
+    }
+    Sprite playerSprite(playerStraightTexture);
+    playerSprite.setOrigin(playerSpriteSize / 2.f, playerSpriteSize / 2.f);
+    playerSprite.setPosition(playerCenterX, playerCenterY);
 
-    //setting up details of the water map
-    Vector2f const TileSize(10.f, 50.f);
-    RectangleShape waterTile(TileSize);
+    //using the image now over the water for water map
+    Texture waterTexture;
+    if (!waterTexture.loadFromFile("images/watermap.png"))
+    {
+        return -1;
+    }
+    waterTexture.setRepeated(true);
+    Sprite waterSprite(waterTexture);
 
-    //setting up details for obstacles
-    RectangleShape obstacleTile(Vector2f(obstacleWidth, obstacleHeight));
-    obstacleTile.setFillColor(obstacleColor);
+    //setting up all the obstacle images to be called one by one
+    Texture obstacleTexture[7];
+    if (!obstacleTexture[0].loadFromFile("images/obstacle1.png"))
+    {
+        return -1;
+    }
+    if (!obstacleTexture[1].loadFromFile("images/obstacle2.png"))
+    {
+        return -1;
+    }
+    if (!obstacleTexture[2].loadFromFile("images/obstacle3.png"))
+    {
+        return -1;
+    }
+    if (!obstacleTexture[3].loadFromFile("images/obstacle4.png"))
+    {
+        return -1;
+    }
+    if (!obstacleTexture[4].loadFromFile("images/obstacle5.png"))
+    {
+        return -1;
+    }
+    if (!obstacleTexture[5].loadFromFile("images/obstacle6.png"))
+    {
+        return -1;
+    }
+    if (!obstacleTexture[6].loadFromFile("images/obstacle7.png"))
+    {
+        return -1;
+    }
+    Sprite obstacleSprite(obstacleTexture[0]);
 
-    //setting up the purple square used to draw monsters
-    RectangleShape monsterTile(Vector2f(monsterWidth, monsterHeight));
-    monsterTile.setFillColor(monsterColor);
+    //setting up the monster sprite
+    Texture monsterTexture;
+    if (!monsterTexture.loadFromFile("images/monster.png"))
+    {
+        return -1;
+    }
+    Sprite monsterSprite(monsterTexture);
 
-    //setting up the yellow triangle used to draw boosters
-    ConvexShape boosterTile(3);
-    boosterTile.setPoint(0, Vector2f(boosterWidth / 2.f, 0.f));
-    boosterTile.setPoint(1, Vector2f(boosterWidth, boosterHeight));
-    boosterTile.setPoint(2, Vector2f(0.f, boosterHeight));
-    boosterTile.setFillColor(boosterColor);
+    //setting up booster sprite
+    Texture boosterTexture;
+    if (!boosterTexture.loadFromFile("images/booster.png"))
+    {
+        return -1;
+    }
+    Sprite boosterSprite(boosterTexture);
 
-    //setting up the red circle used to draw lives
-    CircleShape lifeTile(lifeWidth / 2.f);
-    lifeTile.setFillColor(lifeColor);
-    lifeTile.setOutlineColor(Color::White);
-    lifeTile.setOutlineThickness(2.f);
+    //setting up the life sprite
+    Texture lifeTexture;
+    if (!lifeTexture.loadFromFile("images/life.png"))
+    {
+        return -1;
+    }
+    Sprite lifeSprite(lifeTexture);
 
     //setting up the life counter text at the top middle of the screen
     Font font;
@@ -628,7 +694,7 @@ int main() {
             }
             ObstacleRemoval(gameState);
             // the player's rectangle, built once and used for both the obstacles and the monsters
-            FloatRect playerBounds(shape.getPosition().x, shape.getPosition().y, radius * 2.f, radius * 2.f);
+            FloatRect playerBounds(playerCenterX - playerHitWidth / 2.f, playerCenterY - playerHitHeight / 2.f, playerHitWidth, playerHitHeight);
             ObstacleCollision(gameState, playerBounds);
 
             float speedFactor = 1.f;
@@ -688,53 +754,52 @@ int main() {
         FloatRect distBounds = distanceText.getLocalBounds();
         distanceText.setOrigin(distBounds.left + distBounds.width / 2.f, 0.f);
 
-        window.clear(Color(30, 80, 140));  // screen color set to a blue shade
+        window.clear(Color(42, 55, 66));  // screen color set to a blue shade
 
-        for (int column = 0; column < 18; column++)
-        {
-            for (int row = 0; row < 11; row++)
-            {
-                if ((row + column) % 2 == 0)
-                {
-                    waterTile.setFillColor(Color(0, 128, 128));
-                }
-                else
-                {
-                    waterTile.setFillColor(Color(65, 105, 225));
-                }
-                waterTile.setPosition((column * 80.f) + gameState.waterMap.HorizontalWaterMovement, (row * 80.f) + gameState.waterMap.VerticalWaterMovement);
-                window.draw(waterTile);
-            }
-        }
+        waterSprite.setTextureRect(IntRect(int(-gameState.waterMap.HorizontalWaterMovement), int(-gameState.waterMap.VerticalWaterMovement), 1280, 720));
+        window.draw(waterSprite);
 
         // following loop draws the obstacles, boosters and lives on the screen
         for (int i = 0; i < int(gameState.obstacles.size()); ++i)
         {
             if (gameState.obstacles[i].isBooster)
             {
-                boosterTile.setPosition(gameState.obstacles[i].xpos, gameState.obstacles[i].ypos);
-                window.draw(boosterTile);
+                boosterSprite.setPosition(gameState.obstacles[i].xpos - 12.f, gameState.obstacles[i].ypos - 12.f);
+                window.draw(boosterSprite);
             }
             else if (gameState.obstacles[i].isLife)
             {
-                lifeTile.setPosition(gameState.obstacles[i].xpos, gameState.obstacles[i].ypos);
-                window.draw(lifeTile);
+                lifeSprite.setPosition(gameState.obstacles[i].xpos - 12.f, gameState.obstacles[i].ypos - 12.f);
+                window.draw(lifeSprite);
             }
             else
             {
-                obstacleTile.setPosition(gameState.obstacles[i].xpos, gameState.obstacles[i].ypos);
-                window.draw(obstacleTile);
+                obstacleSprite.setTexture(obstacleTexture[gameState.obstacles[i].type]);
+                obstacleSprite.setPosition(gameState.obstacles[i].xpos - 24.f, gameState.obstacles[i].ypos - 104.f);
+                window.draw(obstacleSprite);
             }
         }
 
         //drawing monster
         for (int i = 0; i < int(gameState.monsters.size()); ++i)
         {
-            monsterTile.setPosition(gameState.monsters[i].xpos, gameState.monsters[i].ypos);
-            window.draw(monsterTile);
+            monsterSprite.setPosition(gameState.monsters[i].xpos - 14.f, gameState.monsters[i].ypos - 14.f);
+            window.draw(monsterSprite);
         }
 
-        window.draw(shape);
+        if (gameState.Direction == -1)
+        {
+            playerSprite.setTexture(playerLeftTexture);
+        }
+        else if (gameState.Direction == 1)
+        {
+            playerSprite.setTexture(playerRightTexture);
+        }
+        else
+        {
+            playerSprite.setTexture(playerStraightTexture);
+        }
+        window.draw(playerSprite);
         window.draw(lifeText);
         window.draw(distanceText);
         window.draw(bestText);
