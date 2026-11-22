@@ -1,4 +1,5 @@
 #include <SFML/Graphics.hpp>
+#include <SFML/Audio.hpp>
 #include <vector>
 #include <random>
 #include <string>
@@ -23,12 +24,10 @@ float const playerHitHeight = 88.f;
 int const maxNumObstacles = 30;
 float const obstacleWidth = 200.f;
 float const obstacleHeight = 200.f;
-Color const obstacleColor(120, 90, 60);
 float const ODL = -500; //Obstacle Distance limit, the maximum distance after the obstacles are despawned
 
 float const boosterWidth = 40.f;
 float const boosterHeight = 40.f;
-Color const boosterColor(255, 220, 0);
 int const numBoosterSpots = 4;
 Vector2f const boosterSpots[numBoosterSpots] = {
     Vector2f(160.f, height + 40.f),
@@ -50,7 +49,6 @@ float const speedUpMultiplier = 2.5f;        // speed multiplier (water and mons
 //constants for lives
 float const lifeWidth = 40.f;
 float const lifeHeight = 40.f;
-Color const lifeColor(220, 20, 60);
 int const numLifeSpots = 3;
 Vector2f const lifeSpots[numLifeSpots] = {
     Vector2f(320.f, height + 40.f),
@@ -64,7 +62,6 @@ int const startingLives = 3;
 //constants for the monster
 float const monsterWidth = 100.f;
 float const monsterHeight = 100.f;
-Color const monsterColor(150, 0, 200);
 int const monsterSpawnChance = 900;
 float const monsterSpeedMultiplier = 1.2f;
 float const monsterODL = -2000.f; // monsters are removed much later than obstacles
@@ -606,6 +603,15 @@ int main() {
         return -1;
     }
 
+    Music music;
+    if (music.openFromFile("Music/bgm.mp3"))
+    {
+        music.setLoop(true);
+        music.setVolume(20.f);
+        music.play();
+    }
+
+
     Text lifeText;
     lifeText.setFont(font);
     lifeText.setCharacterSize(32);
@@ -621,7 +627,7 @@ int main() {
     distanceText.setFillColor(Color::White);
     distanceText.setOutlineColor(Color::Black);
     distanceText.setOutlineThickness(2.f);
-    distanceText.setPosition((width / 2.f)+10.f, 55.f); // 40 pixels below the lives text
+    distanceText.setPosition((width / 2.f) + 10.f, 55.f); // 40 pixels below the lives text
 
     //setting up the game over text
     Text gameOverText;
@@ -630,7 +636,7 @@ int main() {
     gameOverText.setFillColor(Color::White);
     gameOverText.setOutlineColor(Color::Black);
     gameOverText.setOutlineThickness(3.f);
-    gameOverText.setString("Musa Died\nPress Enter to restart");
+    gameOverText.setString("Surfer Died\nPress Enter to restart");
     FloatRect goBounds = gameOverText.getLocalBounds();
     gameOverText.setOrigin(goBounds.left + goBounds.width / 2.f, goBounds.top + goBounds.height / 2.f);
     gameOverText.setPosition(width / 2.f, height / 2.f);
@@ -881,7 +887,10 @@ int main() {
         {
             playerSprite.setTexture(playerStraightTexture);
         }
-        window.draw(playerSprite);
+        if (gameState.obstacleCollisionTimer <= 0.f || gameState.lives <= 0 || int(gameState.obstacleCollisionTimer * 10) % 2 == 0)
+        {
+            window.draw(playerSprite);
+        }
         window.draw(lifeText);
         window.draw(distanceText);
         window.draw(bestText);
