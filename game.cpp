@@ -36,7 +36,7 @@ Vector2f const boosterSpots[numBoosterSpots] = {
     Vector2f(800.f, height + 40.f),
     Vector2f(1120.f, height + 40.f)
 };
-int const boosterSpawnChance = 600;
+int const boosterSpawnChance = 500;
 int const maxBoosters = 3;
 
 float const boostSpeedMultiplier = 2.f;
@@ -65,7 +65,7 @@ int const startingLives = 3;
 float const monsterWidth = 100.f;
 float const monsterHeight = 100.f;
 Color const monsterColor(150, 0, 200);
-int const monsterSpawnChance = lifeSpawnChance;
+int const monsterSpawnChance = 900;
 float const monsterSpeedMultiplier = 1.2f;
 float const monsterODL = -2000.f; // monsters are removed much later than obstacles
 int const numMonsterSpots = 3;
@@ -74,6 +74,12 @@ Vector2f const monsterSpots[numMonsterSpots] = {
     Vector2f(560.f, height + 40.f),
     Vector2f(880.f, height + 40.f)
 };
+//constants for the start screen
+float const titleScale = 0.98f;
+int const titleOpacity = 220;
+int const titleBrightness = 110;
+float const titleTextTop = 0.42f;
+float const titleTextGap = 16.f;
 //adding structs to our game
 struct WaterMap
 {
@@ -584,19 +590,29 @@ int main() {
     }
     Sprite lifeSprite(lifeTexture);
 
-    //setting up the life counter text at the top middle of the screen
-    Font font;
-    if (!font.loadFromFile("C:/Windows/Fonts/pala.ttf"))
+    //loading the start screen logo
+    Texture titleTexture;
+    if (!titleTexture.loadFromFile("images/title.png"))
     {
         return -1;
     }
+
+    //setting up the life counter text at the top middle of the screen
+    Font font;
+
+
+    if (!font.loadFromFile("fonts/Norse.otf") && !font.loadFromFile("C:/Windows/Fonts/seguihis.ttf"))
+    {
+        return -1;
+    }
+
     Text lifeText;
     lifeText.setFont(font);
     lifeText.setCharacterSize(32);
     lifeText.setFillColor(Color::White);
     lifeText.setOutlineColor(Color::Black);
     lifeText.setOutlineThickness(2.f);
-    lifeText.setPosition(width / 2.f, 10.f); // x is the horizontal center, the origin is set every frame below
+    lifeText.setPosition((width / 2.f) + 32.f, 10.f); // x is the horizontal center, the origin is set every frame below
 
     //distance text, centered directly below the lives text
     Text distanceText;
@@ -605,7 +621,7 @@ int main() {
     distanceText.setFillColor(Color::White);
     distanceText.setOutlineColor(Color::Black);
     distanceText.setOutlineThickness(2.f);
-    distanceText.setPosition(width / 2.f, 50.f); // 40 pixels below the lives text
+    distanceText.setPosition((width / 2.f)+10.f, 55.f); // 40 pixels below the lives text
 
     //setting up the game over text
     Text gameOverText;
@@ -637,6 +653,50 @@ int main() {
     bestText.setOutlineColor(Color::Black);
     bestText.setOutlineThickness(2.f);
     bestText.setPosition(width - 220.f, 10.f);
+
+    //setting up the start screen: the logo as a see-through layer over the game, with the prompt below it
+    titleTexture.setSmooth(true);
+    Vector2u titleSize = titleTexture.getSize();
+
+
+    float titleHeight = titleSize.y * titleScale;
+    float playerBottom = playerCenterY + playerSpriteSize / 2.f;
+    float titleTop = playerBottom + titleTextGap - titleTextTop * titleHeight;
+    float titleCenterY = titleTop + titleHeight / 2.f;
+    Sprite titleSprite(titleTexture);
+
+    titleSprite.setOrigin(titleSize.x / 2.f, titleSize.y / 2.f);
+    titleSprite.setPosition(width / 2.f, titleCenterY);
+    titleSprite.setScale(titleScale, titleScale);
+    titleSprite.setColor(Color(titleBrightness, titleBrightness, titleBrightness, titleOpacity));
+    Text startText;
+
+    startText.setFont(font);
+    startText.setCharacterSize(40);
+    startText.setFillColor(Color::White);
+    startText.setOutlineColor(Color::Black);
+    startText.setOutlineThickness(3.f);
+    startText.setString("Press 'S' to Start");
+
+    FloatRect startBounds = startText.getLocalBounds();
+    startText.setOrigin(startBounds.left + startBounds.width / 2.f, startBounds.top + startBounds.height / 2.f);
+    startText.setPosition(width / 2.f, titleTop + titleHeight + 30.f);
+    bool showStart = true; //the game is frozen until S is pressed
+    Text instrButton;
+    instrButton.setFont(font);
+    instrButton.setCharacterSize(30);
+    instrButton.setFillColor(Color::White);
+    instrButton.setOutlineColor(Color::Black);
+    instrButton.setOutlineThickness(3.f);
+    instrButton.setString("Instructions");
+    instrButton.setPosition(20.f, height - 60.f);
+    Text instrText = instrButton;
+    instrText.setString("Use WASD or ARROW keys to navigate\nPress F to use booster\nDont let Jormungandr catch you\nPress ESC to show Start Screen ");
+    instrText.setPosition(20.f, height - 200.f);
+    bool showInstr = false;
+
+
+
     Clock clock;  //declaring a clock to keep counting time between each frame
     while (window.isOpen())
     {
@@ -654,9 +714,31 @@ int main() {
             {
                 window.close();
             }
-            if (event.type == Event::KeyPressed)
+            if (event.type == Event::MouseButtonPressed && showStart && instrButton.getGlobalBounds().contains(float(event.mouseButton.x), float(event.mouseButton.y)))
             {
-                if (gameState.lives <= 0)
+                showInstr = !showInstr;
+            }
+            if (event.type == Event::KeyPressed)
+
+            {
+                if (event.key.code == Keyboard::Escape)
+                {
+                    ResetGame(gameState);
+                    showStart = true;
+                    showInstr = false;
+                }
+
+                if (showStart)
+                {
+                    // start screen: Starts the game 
+                    if (event.key.code == Keyboard::S)
+                    {
+                        showStart = false;
+                        gameState.scrolling = true;
+                        gameState.Direction = 0;
+                    }
+                }
+                else if (gameState.lives <= 0)
                 {
                     // game over: only Enter does anything, and it resets the game
                     if (event.key.code == Keyboard::Enter)
@@ -681,8 +763,8 @@ int main() {
             }
         }
 
-        // the game only updates while the player still has lives, otherwise everything freezes
-        if (gameState.lives > 0)
+        // the game only updates while the start screen is gone and the player still has lives, otherwise everything freezes
+        if (!showStart && gameState.lives > 0)
         {
             //calling the spawn and removal functions to spawn and remove obstacles from window
             if (gameState.scrolling)
@@ -744,7 +826,7 @@ int main() {
         }
 
         //updating the life counter, distance and best score text
-        lifeText.setString("Lives: " + to_string(gameState.lives) + "    Boosters: " + to_string(gameState.boosters));
+        lifeText.setString("Lives: " + to_string(gameState.lives) + "          Boosters: " + to_string(gameState.boosters));
         distanceText.setString(to_string(int(gameState.distance / 10.f)) + "m");
         bestText.setString("Best: " + to_string(bestScore));
 
@@ -803,6 +885,18 @@ int main() {
         window.draw(lifeText);
         window.draw(distanceText);
         window.draw(bestText);
+
+        //draws the start screen 
+        if (showStart)
+        {
+            window.draw(titleSprite);
+            window.draw(startText);
+            window.draw(instrButton);
+            if (showInstr)
+            {
+                window.draw(instrText);
+            }
+        }
 
         //draws the end screen on top of everything when the player has no lives left
         if (gameState.lives <= 0)
