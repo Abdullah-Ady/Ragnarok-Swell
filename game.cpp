@@ -11,8 +11,10 @@ using namespace std;
 //Setting constants as global
 int const width = 1280;
 int const height = 720;
-float const WaterSpeed = 250.f;
+float const WaterSpeed = 400.f;
 float const maximumFrameTime = 0.1f;
+
+float const obstacleGap = 90.f; 
 
 //player sprite and hitbox
 float const playerSpriteSize = 112.f;
@@ -38,13 +40,13 @@ Vector2f const boosterSpots[numBoosterSpots] = {
 int const boosterSpawnChance = 500;
 int const maxBoosters = 3;
 
-float const boostSpeedMultiplier = 2.f;
+float const boostSpeedMultiplier = 2.0f;
 float const obstacleSpeedReducer = 0.3f;
 float const boostDuration = 2.f;
 float const obstacleCollisionCoolDown = 2.f; // value raised from 0.3f, it now acts as the invincibility duration
 float const slowDuration = 0.5f;             // how long you are slowed after losing a life
-float const speedUpDistance = 1500.f;         // in meters (the same value shown on screen)
-float const speedUpMultiplier = 2.5f;        // speed multiplier (water and monsters) once speedUpDistance is reached
+float const speedUpDistance = 1000.f;         // in meters (the same value shown on screen)
+float const speedUpMultiplier = 1.3f;        // speed multiplier (water and monsters) once speedUpDistance is reached
 
 //constants for lives
 float const lifeWidth = 40.f;
@@ -62,7 +64,7 @@ int const startingLives = 3;
 //constants for the monster
 float const monsterWidth = 100.f;
 float const monsterHeight = 100.f;
-int const monsterSpawnChance = 900;
+int const monsterSpawnChance = 500;
 float const monsterSpeedMultiplier = 1.2f;
 float const monsterODL = -2000.f; // monsters are removed much later than obstacles
 int const numMonsterSpots = 3;
@@ -257,7 +259,7 @@ void ObstacleSpawn(GameState& g)
         {
             return;
         }
-        if (SpotOverlapsObstacle(g, FloatRect(newObstacle.xpos, newObstacle.ypos, obstacleWidth, obstacleHeight)))
+        if (SpotOverlapsObstacle(g, FloatRect(newObstacle.xpos - obstacleGap, newObstacle.ypos - obstacleGap, obstacleWidth + 2 * obstacleGap, obstacleHeight + 2 * obstacleGap)))
         {
             return;
         }
@@ -338,6 +340,7 @@ void MonsterSpawn(GameState& g)
         }
     }
     g.monsters.push_back(newMonster);
+    
 }
 
 //function for scrolling the obstacles along with the water tiles
@@ -658,7 +661,7 @@ int main() {
     bestText.setFillColor(Color::White);
     bestText.setOutlineColor(Color::Black);
     bestText.setOutlineThickness(2.f);
-    bestText.setPosition(width - 220.f, 10.f);
+    bestText.setPosition(width - 160.f, 10.f);
 
     //setting up the start screen: the logo as a see-through layer over the game, with the prompt below it
     titleTexture.setSmooth(true);
